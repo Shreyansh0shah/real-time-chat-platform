@@ -1,61 +1,68 @@
 const express = require("express");
-const connectDB = require("./config/db");
-const dotenv = require("dotenv");
-const userRoutes = require("./routes/userRoutes");
-const chatRoutes = require("./routes/chatRoutes");
-const messageRoutes = require("./routes/messageRoutes");
-const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const path = require("path");
-const Message = require("./models/messageModel"); // ✅ ADDED
+const dotenv = require("dotenv");
+const connectDB = require("./config/db");
+const applyMiddleware = require("./middleware");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const { shutdown } = require("./serverUtils");
+const Message = require("./models/messageModel");
 
-dotenv.config();
+const envFilePath = path.resolve(__dirname, "../.env");
+dotenv.config({ path: envFilePath });
+process.env.NODE_ENV = process.env.NODE_ENV || "development";
 connectDB();
 
 const app = express();
-app.use(express.json());
+applyMiddleware(app);
 
-// Routes
-app.use("/api/user", userRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/message", messageRoutes);
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.use("/api/user", require("./routes/userRoutes"));
+app.use("/api/chat", require("./routes/chatRoutes"));
+app.use("/api/message", require("./routes/messageRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 
-const __dirname1 = path.resolve();
+const appRoot = path.resolve();
 app.use(
   "/backend/uploads",
-  express.static(path.join(__dirname1, "/backend/uploads"))
+  express.static(path.join(appRoot, "uploads"))
 );
 
-// ---------------- DEPLOYMENT ----------------
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname1, "/frontend/build")));
+  app.use(express.static(path.join(appRoot, "/frontend/build")));
 
   app.get("*", (req, res) =>
-    res.sendFile(path.resolve(__dirname1, "frontend", "build", "index.html"))
+    res.sendFile(path.resolve(appRoot, "frontend", "build", "index.html"))
   );
 } else {
   app.get("/", (req, res) => {
     res.send("API is running..");
   });
 }
-// ---------------- DEPLOYMENT ----------------
 
-// Error Handling
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5001;
 
-const server = app.listen(
-  PORT,
-  console.log(`Server running on PORT ${PORT}...`)
-);
+const server = app.listen(PORT, () => {
+  console.log(`Server running on PORT ${PORT} in ${process.env.NODE_ENV} mode...`);
+});
 
-// ---------------- SOCKET.IO ----------------
 const io = require("socket.io")(server, {
   pingTimeout: 60000,
   cors: {
-    origin: "http://localhost:3000",
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
+      : ["http://localhost:3000"],
+    methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -64,7 +71,6 @@ const onlineUsers = new Map();
 io.on("connection", (socket) => {
   console.log("Connected to socket.io");
 
-  // Setup user
   socket.on("setup", (userData) => {
     if (!userData || !userData._id) return;
 
@@ -78,7 +84,6 @@ io.on("connection", (socket) => {
     io.emit("get-online-users", Array.from(onlineUsers.keys()));
   });
 
-  // Join chat room
   socket.on("join chat", (room) => {
     socket.join(room);
     console.log("User Joined Room: " + room);
@@ -87,11 +92,10 @@ io.on("connection", (socket) => {
   socket.on("typing", (room) => socket.in(room).emit("typing"));
   socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
 
-  // New message
   socket.on("new message", (newMessageRecieved) => {
-    var chat = newMessageRecieved.chat;
+    const chat = newMessageRecieved.chat;
 
-    if (!chat.users) return;
+    if (!chat || !chat.users) return;
 
     chat.users.forEach((user) => {
       if (user._id == newMessageRecieved.sender._id) return;
@@ -99,7 +103,6 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ✅ MESSAGE SEEN (BLUE TICK LOGIC)
   socket.on("message seen", async ({ chatId, userId }) => {
     try {
       await Message.updateMany(
@@ -111,7 +114,6 @@ io.on("connection", (socket) => {
         { $set: { isSeen: true } }
       );
 
-      // Notify sender that messages are seen
       socket.to(chatId).emit("message seen update", chatId);
     } catch (error) {
       console.error("Seen update error:", error.message);
@@ -134,3 +136,9 @@ io.on("connection", (socket) => {
     console.log("USER DISCONNECTED");
   });
 });
+
+const gracefulShutdown = shutdown(server, require("mongoose"));
+
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
+
