@@ -7,7 +7,10 @@ const messageSchema = mongoose.Schema(
     fileUrl: { type: String, default: "" },
     fileType: { type: String, default: "text" },
     chat: { type: mongoose.Schema.Types.ObjectId, ref: "Chat" },
-    isSeen: {type: Boolean,default: false,},
+    replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
+    isDelivered: { type: Boolean, default: false },
+    isEdited: { type: Boolean, default: false },
+    isSeen: { type: Boolean, default: false },
     readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }

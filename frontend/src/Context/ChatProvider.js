@@ -10,6 +10,7 @@ const ChatProvider = ({ children }) => {
   const [user, setUser] = useState();
   const [notification, setNotification] = useState([]);
   const [chats, setChats] = useState();
+  const [unreadCounts, setUnreadCounts] = useState({});
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [socket, setSocket] = useState(null);
   const socketRef = useRef();
@@ -75,6 +76,8 @@ const ChatProvider = ({ children }) => {
         setNotification,
         chats,
         setChats,
+        unreadCounts,
+        setUnreadCounts,
         onlineUsers,
         setOnlineUsers,
         isUserOnline,

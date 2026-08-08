@@ -3,15 +3,16 @@ import { Input } from "@chakra-ui/input";
 import { Avatar, AvatarBadge } from "@chakra-ui/avatar";
 import { Box, Flex, Text } from "@chakra-ui/layout";
 import "./styles.css";
-import { IconButton, Spinner, useToast } from "@chakra-ui/react";
+import { Button, IconButton, Spinner, Textarea, useColorModeValue, useToast } from "@chakra-ui/react";
 import { getSender, getSenderFull } from "../config/ChatLogics";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { ArrowBackIcon, AttachmentIcon, ChatIcon } from "@chakra-ui/icons";
 import ProfileModal from "./miscellaneous/ProfileModal";
 import ScrollableChat from "./ScrollableChat";
 import Lottie from "react-lottie";
 import animationData from "../animations/typing.json";
+import EmojiPicker from "emoji-picker-react";
 
 import io from "socket.io-client";
 import UpdateGroupChatModal from "./miscellaneous/UpdateGroupChatModal";
@@ -26,6 +27,13 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
   const [socketConnected, setSocketConnected] = useState(false);
   const [typing, setTyping] = useState(false);
   const [istyping, setIsTyping] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchCount, setSearchCount] = useState(0);
+  const [searchTargetId, setSearchTargetId] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
   const toast = useToast();
 
   const defaultOptions = {
@@ -36,12 +44,18 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
       preserveAspectRatio: "xMidYMid slice",
     },
   };
-  const { selectedChat, setSelectedChat, user, notification, setNotification, setOnlineUsers, isUserOnline } =
+  const { selectedChat, setSelectedChat, user, notification, setNotification, setUnreadCounts, setOnlineUsers, isUserOnline } =
     ChatState();
 
   const otherUser = selectedChat && !selectedChat.isGroupChat && user
     ? getSenderFull(user, selectedChat.users)
     : null;
+  const shellBg = useColorModeValue("slate.50", "slate.950");
+  const panelBg = useColorModeValue("white", "slate.900");
+  const inputBg = useColorModeValue("gray.100", "slate.800");
+  const borderColor = useColorModeValue("gray.200", "slate.700");
+  const formBg = useColorModeValue("gray.50", "slate.800");
+  const headerText = useColorModeValue("slate.900", "slate.100");
 
   const fetchMessages = async () => {
     if (!selectedChat) return;
@@ -109,6 +123,65 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
     }
   };
 
+  const handleEmojiClick = (event, emojiData) => {
+    const emoji = emojiData?.emoji || "";
+    setNewMessage((prevMessage) => {
+      const start = Math.min(selection.start, selection.end);
+      const end = Math.max(selection.start, selection.end);
+      const before = prevMessage.slice(0, start);
+      const after = prevMessage.slice(end);
+      const updatedMessage = `${before}${emoji}${after}`;
+
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          const cursorPos = start + emoji.length;
+          inputRef.current.setSelectionRange(cursorPos, cursorPos);
+          setSelection({ start: cursorPos, end: cursorPos });
+        }
+      }, 0);
+
+      return updatedMessage;
+    });
+
+    setShowEmojiPicker(false);
+  };
+
+  const updateSelection = () => {
+    if (!inputRef.current) return;
+    setSelection({
+      start: inputRef.current.selectionStart || 0,
+      end: inputRef.current.selectionEnd || 0,
+    });
+  };
+
+  const typingHandler = (event) => {
+    const messageText = event.target.value;
+    setNewMessage(messageText);
+    setSelection({
+      start: event.target.selectionStart || 0,
+      end: event.target.selectionEnd || 0,
+    });
+
+    if (!socketConnected || !selectedChat) return;
+
+    if (!typing) {
+      setTyping(true);
+      socket.emit("typing", selectedChat._id);
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      if (typing) {
+        socket.emit("stop typing", selectedChat._id);
+        setTyping(false);
+      }
+    }, 3000);
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -125,9 +198,20 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
   }, [user]);
 
   useEffect(() => {
+    setSearchTerm("");
+    setSearchCount(0);
+    setSearchTargetId(null);
+
     fetchMessages();
 
     selectedChatCompare = selectedChat;
+    if (selectedChat) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [selectedChat._id]: 0,
+      }));
+    }
+
     if (selectedChat && notification.length > 0) {
       const filtered = notification.filter((n) => n.chat._id !== selectedChat._id);
       if (filtered.length !== notification.length) {
@@ -135,11 +219,11 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
       }
     }
     if (selectedChat && socket && user) {
-    socket.emit("message seen", {
-      chatId: selectedChat._id,
-      userId: user._id,
-    });
-  }
+      socket.emit("message seen", {
+        chatId: selectedChat._id,
+        userId: user._id,
+      });
+    }
     // eslint-disable-next-line
   }, [selectedChat]);
 
@@ -153,6 +237,11 @@ useEffect(() => {
     ) {
       if (!notification.includes(newMessageRecieved)) {
         setNotification((prev) => [newMessageRecieved, ...prev]);
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [newMessageRecieved.chat._id]:
+            (prev[newMessageRecieved.chat._id] || 0) + 1,
+        }));
         setFetchAgain((prev) => !prev);
       }
     } else {
@@ -165,29 +254,7 @@ useEffect(() => {
   return () => {
     socket.off("message recieved", handleMessageReceived);
   };
-}, [notification, fetchAgain]);
-
-
-  const typingHandler = (e) => {
-    setNewMessage(e.target.value);
-
-    if (!socketConnected) return;
-
-    if (!typing) {
-      setTyping(true);
-      socket.emit("typing", selectedChat._id);
-    }
-    let lastTypingTime = new Date().getTime();
-    var timerLength = 3000;
-    setTimeout(() => {
-      var timeNow = new Date().getTime();
-      var timeDiff = timeNow - lastTypingTime;
-      if (timeDiff >= timerLength && typing) {
-        socket.emit("stop typing", selectedChat._id);
-        setTyping(false);
-      }
-    }, timerLength);
-  };
+}, [notification, fetchAgain, setUnreadCounts]);
 
   return (
     <>
@@ -259,16 +326,16 @@ useEffect(() => {
             flexDir="column"
             justifyContent="space-between"
             p={3}
-            bg="gray.50"
+            bg={panelBg}
             w="100%"
             h="100%"
-            borderRadius="lg"
+            borderRadius="2xl"
             borderWidth="1px"
-            borderColor="gray.200"
+            borderColor={borderColor}
             shadow="sm"
             overflow="hidden"
           >
-            <Box flex="1" mb={3} overflowY="auto" bg="white" borderRadius="lg" p={4}>
+            <Box flex="1" mb={3} overflowY="auto" bg={shellBg} borderRadius="2xl" p={4}>
               {loading ? (
                 <Spinner
                   size="xl"
@@ -289,6 +356,13 @@ useEffect(() => {
               id="first-name"
               isRequired
             >
+              <Box
+                bg={formBg}
+                borderRadius="2xl"
+                p={4}
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
               {istyping ? (
                 <Box mb={3}>
                   <Lottie
@@ -369,13 +443,43 @@ useEffect(() => {
                   onClick={() => document.getElementById("file-input").click()}
                   mr={2}
                 />
-                <Input
+                <Button
+                  variant="ghost"
+                  minW="40px"
+                  px={0}
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  mr={2}
+                >
+                  😀
+                </Button>
+                <Textarea
+                  ref={inputRef}
+                  resize="vertical"
+                  minH="12"
+                  maxH="40"
                   variant="filled"
                   bg="gray.100"
                   placeholder="Enter a message.."
                   value={newMessage}
                   onChange={typingHandler}
+                  onSelect={updateSelection}
+                  onClick={updateSelection}
+                  onKeyUp={updateSelection}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage(event);
+                    }
+                  }}
                 />
+              </Box>
+              {showEmojiPicker && (
+                <Box position="relative" mt={2} zIndex={10}>
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                  />
+                </Box>
+              )}
               </Box>
             </FormControl>
           </Box>
