@@ -14,47 +14,27 @@ const Chatpage = () => {
   const borderColor = useColorModeValue("gray.200", "gray.700");
 
   return (
-    <Box bg={bg} minH="100vh" p={{ base: 3, md: 6 }}>
-      {user && <SideDrawer />}
-      <Box
-        maxW="7xl"
-        mx="auto"
-        bg={panelBg}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderColor={borderColor}
-        boxShadow="sm"
-        overflow="hidden"
-        h="91.5vh"
-      >
-        <Box p={{ base: 4, md: 5 }} borderBottomWidth="1px" borderColor={borderColor}>
-          <Flex alignItems="center" justifyContent="space-between" gap={4}>
-            <Box>
-              <Text
-                fontSize={{ base: "2xl", md: "3xl" }}
-                fontWeight="semibold"
-                letterSpacing="tight"
-                bgGradient="linear(to-r, teal.300, blue.500)"
-                bgClip="text"
-              >
-                Chatting Platform
-              </Text>
-              <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.400")}> 
-                A polished demo-ready realtime chat experience
-              </Text>
-            </Box>
-          </Flex>
-        </Box>
+  <div style={{ width: "100%" }}>
+    {user && <SideDrawer />}
 
-        <Flex h="full" p={{ base: 4, md: 5 }} gap={4}>
-          {user && <MyChats fetchAgain={fetchAgain} />}
-          {user && (
-            <Chatbox fetchAgain={fetchAgain} setFetchAgain={setFetchAgain} />
-          )}
-        </Flex>
-      </Box>
+    <Box
+      display="flex"
+      justifyContent="space-between"
+      w="100%"
+      h="91.5vh"
+      p="10px"
+    >
+      {user && <MyChats fetchAgain={fetchAgain} />}
+
+      {user && (
+        <Chatbox
+          fetchAgain={fetchAgain}
+          setFetchAgain={setFetchAgain}
+        />
+      )}
     </Box>
-  );
+  </div>
+);
 };
 
 export default Chatpage;

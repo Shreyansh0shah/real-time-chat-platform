@@ -103,9 +103,9 @@ const MyChats = ({ fetchAgain }) => {
             <Text fontSize={{ base: "2xl", md: "3xl" }} fontWeight="semibold" color={textColor}>
               Chats
             </Text>
-            <Text fontSize="sm" color={subTextColor}> 
-              Search conversations and stay organized
-            </Text>
+            {/* <Text fontSize="sm" color={subTextColor}> 
+              Search conversations and stay organized 
+            </Text> */}
           </Box>
           <GroupChatModal>
             <Button size="sm" rightIcon={<AddIcon />}>
