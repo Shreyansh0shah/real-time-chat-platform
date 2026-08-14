@@ -23,16 +23,38 @@ const applyMiddleware = (app) => {
   app.use(helmet());
 
   const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
-    : ["http://localhost:3000"];
+  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
+  : [];
 
-  app.use(
-    cors({
-      origin: allowedOrigins,
-      credentials: true,
-      optionsSuccessStatus: 200,
-    })
-  );
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests without an Origin header
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Allow localhost during development
+      if (origin === "http://localhost:3000") {
+        return callback(null, true);
+      }
+
+      // Allow all Vercel deployment URLs
+      if (/^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow explicitly configured origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    optionsSuccessStatus: 200,
+  })
+);
 
   app.use(compression());
 
