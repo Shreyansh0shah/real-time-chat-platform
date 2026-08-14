@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import { useHistory } from "react-router-dom";
 import io from "socket.io-client";
 
-const ENDPOINT = "http://localhost:5001";
+const ENDPOINT =
+  process.env.REACT_APP_API_URL || "http://localhost:5001";
 const ChatContext = createContext();
 
 const ChatProvider = ({ children }) => {

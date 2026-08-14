@@ -21,7 +21,7 @@ const ScrollableChat = ({ messages, searchTerm, searchTargetId }) => {
   const getFileUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    return `http://localhost:5001${url}`;
+    return `${process.env.REACT_APP_API_URL || "http://localhost:5001"}${url}`;
   };
 
   const shouldShowDayDivider = (currentMessage, index) => {
