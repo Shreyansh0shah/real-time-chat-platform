@@ -68,7 +68,7 @@ const Signup = () => {
       };
 
       const { data } = await axios.post(
-        "/api/user",
+        `${process.env.REACT_APP_API_URL || "http://localhost:5001"}/api/user`,
         { name, email, username, password, pic },
         config
       );
