@@ -4,25 +4,7 @@ A modern **full-stack real-time chat application** built using the **MERN Stack*
 
 ---
 
-# 📸 Project Preview
 
-> *(Add screenshots or GIFs here after deployment.)*
-
-| Login          | Chat Dashboard |
-| -------------- | -------------- |
-| *(Screenshot)* | *(Screenshot)* |
-
----
-
-# 🌐 Live Demo
-
-Frontend: **Coming Soon**
-
-Backend API: **Coming Soon**
-
-AWS Deployment: **Coming Soon**
-
----
 
 # 📌 Features
 
@@ -144,7 +126,7 @@ AWS Deployment: **Coming Soon**
 * Cloudinary
 * Docker
 * Docker Compose
-* AWS EC2 *(Deployment)*
+* Versal and render(Deployment)*
 
 ---
 
